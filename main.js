@@ -170,7 +170,6 @@ function renderCustomers() {
     if (!tile) return;
     const el = document.createElement('div');
     el.className = 'character customer';
-    el.textContent = '😊';
     tile.appendChild(el);
   });
 }
