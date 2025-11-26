@@ -107,10 +107,12 @@ namespace NightclubSim
         private void HandleCameraInput(float dt, KeyboardState keyboard)
         {
             const float speed = 200f;
-            if (keyboard.IsKeyDown(Keys.A)) _iso.Camera.X += speed * dt;
-            if (keyboard.IsKeyDown(Keys.D)) _iso.Camera.X -= speed * dt;
-            if (keyboard.IsKeyDown(Keys.W)) _iso.Camera.Y += speed * dt;
-            if (keyboard.IsKeyDown(Keys.S)) _iso.Camera.Y -= speed * dt;
+            var camera = _iso.Camera;
+            if (keyboard.IsKeyDown(Keys.A)) camera.X += speed * dt;
+            if (keyboard.IsKeyDown(Keys.D)) camera.X -= speed * dt;
+            if (keyboard.IsKeyDown(Keys.W)) camera.Y += speed * dt;
+            if (keyboard.IsKeyDown(Keys.S)) camera.Y -= speed * dt;
+            _iso.Camera = camera;
         }
 
         private void HandleModeInput(KeyboardState keyboard)
