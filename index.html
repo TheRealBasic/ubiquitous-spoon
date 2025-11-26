@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Neon Groove Manager</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="top-bar">
+    <div class="stat">Money: <span id="money">$0</span></div>
+    <div class="stat">Level: <span id="level">1</span> (<span id="xp">0</span> XP)</div>
+    <div class="progress"><div id="xp-bar"></div></div>
+    <div class="stat">Time: <span id="time">00:00</span> <span id="time-phase">Day</span></div>
+    <div class="stat">Status: <span id="club-status" class="closed">Closed</span></div>
+    <button id="toggle-open">Open Club</button>
+    <button id="toggle-mode">Switch to Build Mode</button>
+    <button id="reset-game">New Game</button>
+  </div>
+  <div id="main">
+    <div id="grid-container"></div>
+    <div id="side-panel">
+      <h2>Shop</h2>
+      <div id="category-buttons">
+        <button data-category="furniture" class="active">Furniture</button>
+        <button data-category="decor">Decor</button>
+        <button data-category="staff">Staff</button>
+      </div>
+      <div id="shop-items"></div>
+      <div id="selection-panel">
+        <h3>Selected</h3>
+        <div id="selected-info">None</div>
+        <button id="sell-button">Sell</button>
+        <button id="move-button">Move</button>
+      </div>
+      <h3>Notifications</h3>
+      <div id="log"></div>
+    </div>
+  </div>
+  <div id="tooltip" class="hidden"></div>
+  <div id="floating-container"></div>
+  <audio id="cash-sound" preload="auto"></audio>
+  <audio id="click-sound" preload="auto"></audio>
+  <script src="main.js"></script>
+</body>
+</html>
