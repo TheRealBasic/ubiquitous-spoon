@@ -8,11 +8,6 @@ body {
   color: #f0f0f0;
   overflow: hidden;
 }
-
-:root {
-  --tile-w: 96px;
-  --tile-h: 56px;
-}
 #top-bar {
   display: flex;
   align-items: center;
@@ -47,181 +42,63 @@ body {
 }
 #main {
   display: grid;
-  grid-template-columns: 72% 28%;
+  grid-template-columns: 70% 30%;
   height: calc(100vh - 56px);
 }
 #grid-container {
   position: relative;
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  grid-template-rows: repeat(8, 1fr);
+  gap: 2px;
+  padding: 12px;
   background: rgba(255, 255, 255, 0.03);
-  width: 100%;
-  height: 100%;
-  padding: 20px 0;
-  overflow: hidden;
 }
 .tile {
-  position: absolute;
-  width: var(--tile-w);
-  height: var(--tile-h);
-  transform-style: preserve-3d;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  position: relative;
+  min-height: 70px;
 }
-.tile::before {
-  content: '';
-  position: absolute;
-  width: var(--tile-w);
-  height: var(--tile-w);
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.06), rgba(0, 0, 0, 0.25));
-  transform: translate(-50%, -50%) rotate(45deg) scaleY(0.6);
-  top: 50%;
-  left: 50%;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.35);
+.tile.night {
+  background: rgba(10, 10, 20, 0.7);
 }
-.tile.night::before {
-  background: linear-gradient(135deg, rgba(20, 20, 40, 0.6), rgba(0, 0, 0, 0.4));
-}
-.tile.highlight::after {
-  content: '';
-  position: absolute;
-  width: var(--tile-w);
-  height: var(--tile-w);
-  transform: translate(-50%, -50%) rotate(45deg) scaleY(0.6);
-  top: 50%;
-  left: 50%;
-  border: 2px dashed #6ed3ff;
-  pointer-events: none;
+.tile.highlight {
+  outline: 2px dashed #6ed3ff;
 }
 .object, .character {
   position: absolute;
-  left: 50%;
-  top: 45%;
-  transform: translate(-50%, -50%);
+  inset: 6px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   text-align: center;
   color: #fff;
+  font-weight: bold;
+  font-size: 12px;
+  padding: 4px;
 }
-.object .model {
-  position: relative;
-  margin: 0 auto;
-  transform: skewY(-10deg) rotate(-45deg) scaleY(0.9);
+.object.bar { background: linear-gradient(135deg, #4b2f2f, #7a4a2f); }
+.object.table { background: linear-gradient(135deg, #2f4b2f, #3f7a3b); }
+.object.dance { background: linear-gradient(135deg, #2f2f4b, #533f7a); }
+.object.light { background: linear-gradient(135deg, #444, #999); color:#222; }
+.object.speaker { background: linear-gradient(135deg, #272727, #4b4b4b); }
+.object.decor { background: linear-gradient(135deg, #4b2f4b, #7a3f6b); }
+.object.staff { background: linear-gradient(135deg, #1d6e6a, #1fc4c1); }
+.object.vip { background: linear-gradient(135deg, #99813a, #d4c078); color:#111; }
+.object.stage { background: linear-gradient(135deg, #6a3a3a, #c45b5b); }
+.object.door { background: linear-gradient(135deg, #1e1e1e, #555); }
+.character.customer {
+  background: rgba(255, 255, 255, 0.15);
+  border: 2px solid #70e1ff;
+  inset: 16px;
 }
-.object .label {
-  margin-top: 4px;
-  font-size: 11px;
-  color: #d8e0ff;
-  text-shadow: 0 0 6px #000;
+.character.staff {
+  background: rgba(0, 255, 170, 0.2);
+  border: 2px solid #00ffc6;
+  inset: 16px;
 }
-.object.bar .model {
-  width: 78px;
-  height: 24px;
-  background: linear-gradient(180deg, #7a4a2f 0%, #4b2f2f 100%);
-  box-shadow: inset 0 4px 0 rgba(255, 220, 190, 0.5), 0 8px 12px rgba(0,0,0,0.4);
-  border-radius: 4px;
-}
-.object.bar .model::after {
-  content: '';
-  position: absolute;
-  width: 90%;
-  height: 6px;
-  background: rgba(255, 255, 255, 0.1);
-  top: 2px;
-  left: 5%;
-  border-radius: 3px;
-}
-.object.table .model {
-  width: 48px;
-  height: 48px;
-  background: radial-gradient(circle at 30% 30%, #4e8f5f, #2f4b2f);
-  border-radius: 50%;
-  box-shadow: 0 12px 0 rgba(0,0,0,0.35);
-}
-.object.dance .model {
-  width: 82px;
-  height: 82px;
-  background: repeating-linear-gradient(45deg, #2f2f4b 0 12px, #533f7a 12px 24px, #2d1f5a 24px 36px);
-  clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
-  box-shadow: 0 10px 14px rgba(0,0,0,0.45), 0 0 10px rgba(123, 89, 255, 0.4);
-}
-.object.light .model {
-  width: 10px;
-  height: 58px;
-  background: linear-gradient(180deg, #cfd4ff, #444);
-  box-shadow: 0 0 12px #8af2ff;
-}
-.object.light .model::after {
-  content: '';
-  position: absolute;
-  width: 34px;
-  height: 14px;
-  background: radial-gradient(circle, rgba(255,255,200,0.7), rgba(255,255,200,0));
-  top: -16px;
-  left: -12px;
-}
-.object.speaker .model {
-  width: 38px;
-  height: 60px;
-  background: linear-gradient(180deg, #444, #1b1b1b);
-  border: 2px solid #1f1f1f;
-  box-shadow: 0 10px 10px rgba(0,0,0,0.5);
-}
-.object.speaker .model::before,
-.object.speaker .model::after {
-  content: '';
-  position: absolute;
-  border-radius: 50%;
-  background: radial-gradient(circle, #888, #000);
-  left: 6px;
-  right: 6px;
-  height: 14px;
-}
-.object.speaker .model::before { top: 10px; }
-.object.speaker .model::after { bottom: 10px; }
-.object.vip .model {
-  width: 70px;
-  height: 30px;
-  background: linear-gradient(135deg, #f8e18a, #d4c078);
-  border-radius: 10px;
-  box-shadow: 0 10px 10px rgba(0,0,0,0.4);
-}
-.object.stage .model {
-  width: 90px;
-  height: 24px;
-  background: linear-gradient(180deg, #c45b5b, #6a3a3a);
-  box-shadow: 0 12px 10px rgba(0,0,0,0.45);
-  border-radius: 6px;
-}
-.object.decor .model {
-  width: 40px;
-  height: 40px;
-  background: conic-gradient(from 45deg, #7a3f6b, #4b2f4b, #7a3f6b);
-  border-radius: 50% 10% 50% 10%;
-  box-shadow: 0 10px 14px rgba(0,0,0,0.45);
-}
-.object.door .model {
-  width: 34px;
-  height: 58px;
-  background: linear-gradient(180deg, #777, #222);
-  border-radius: 6px 6px 2px 2px;
-  box-shadow: inset 0 0 0 2px #151515, 0 12px 10px rgba(0,0,0,0.4);
-}
-.object.staff .model {
-  width: 38px;
-  height: 38px;
-  background: radial-gradient(circle at 40% 40%, #25e0c3, #0d7269);
-  border-radius: 50%;
-  box-shadow: 0 8px 12px rgba(0,0,0,0.5);
-}
-.object.dj .model { background: radial-gradient(circle at 40% 40%, #ffd166, #c85f00); }
-.object.bartender .model { background: radial-gradient(circle at 40% 40%, #7cffd4, #1d6e6a); }
-.object.bouncer .model { background: radial-gradient(circle at 40% 40%, #ff7373, #6a1d1d); }
-.character {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 30% 30%, #fff, #8ad4ff);
-  box-shadow: 0 6px 8px rgba(0,0,0,0.4);
-  border: 2px solid rgba(255,255,255,0.5);
-}
-.character.customer { background: radial-gradient(circle at 30% 30%, #fff, #70e1ff); }
-.character.staff { background: radial-gradient(circle at 30% 30%, #b4ffde, #0fc9a7); }
 #side-panel {
   padding: 12px;
   background: rgba(18, 18, 26, 0.9);

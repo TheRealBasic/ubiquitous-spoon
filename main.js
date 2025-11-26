@@ -10,8 +10,6 @@
 
 const GRID_W = 12;
 const GRID_H = 8;
-const TILE_W = 96;
-const TILE_H = 56;
 const SAVE_KEY = 'neon-groove-save';
 const STARTING_MONEY = 500;
 const ENTRANCE_POS = { x: 0, y: Math.floor(GRID_H / 2) };
@@ -115,12 +113,9 @@ function placeInitialObjects() {
 
 function createGrid() {
   const grid = document.getElementById('grid-container');
-  grid.innerHTML = '';
+  grid.style.gridTemplateColumns = `repeat(${GRID_W}, 1fr)`;
+  grid.style.gridTemplateRows = `repeat(${GRID_H}, 1fr)`;
   tiles = [];
-  const offsetX = GRID_H * (TILE_W / 2) + 60;
-  const offsetY = 40;
-  const totalHeight = (GRID_W + GRID_H) * (TILE_H / 2) + TILE_H + offsetY + 60;
-  grid.style.minHeight = `${totalHeight}px`;
   for (let y = 0; y < GRID_H; y++) {
     const row = [];
     for (let x = 0; x < GRID_W; x++) {
@@ -128,11 +123,6 @@ function createGrid() {
       tile.className = 'tile';
       tile.dataset.x = x;
       tile.dataset.y = y;
-      const isoX = (x - y) * (TILE_W / 2) + offsetX;
-      const isoY = (x + y) * (TILE_H / 2) + offsetY;
-      tile.style.left = `${isoX}px`;
-      tile.style.top = `${isoY}px`;
-      tile.style.zIndex = x + y;
       tile.addEventListener('click', onTileClick);
       row.push(tile);
       grid.appendChild(tile);
@@ -166,13 +156,7 @@ function renderObjects() {
     if (!tile) return;
     const el = document.createElement('div');
     el.className = `object ${obj.type}${obj.category === 'staff' ? ' staff' : ''}`;
-    const model = document.createElement('div');
-    model.className = 'model';
-    const label = document.createElement('div');
-    label.className = 'label';
-    label.textContent = obj.name;
-    el.appendChild(model);
-    el.appendChild(label);
+    el.textContent = obj.name;
     tile.appendChild(el);
     if (obj.id === state.selectedObjectId) {
       tile.classList.add('highlight');
