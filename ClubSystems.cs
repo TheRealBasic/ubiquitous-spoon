@@ -84,7 +84,12 @@ namespace NightclubSim
         public int DeniedGuests { get; private set; }
         public float QueueFairnessBonus { get; private set; }
 
-        public int ResearchPoints { get; private set; } = 5;
+        private int _researchPoints = 5;
+        public int ResearchPoints
+        {
+            get => _researchPoints;
+            private set => _researchPoints = value;
+        }
         public IReadOnlyList<ResearchNode> ResearchNodes => _research;
         private readonly List<ResearchNode> _research = new();
 
@@ -370,7 +375,7 @@ namespace NightclubSim
         public void UnlockResearch(string id)
         {
             var node = _research.FirstOrDefault(r => r.Id == id);
-            if (node != null && node.TryUnlock(ref ResearchPoints))
+            if (node != null && node.TryUnlock(ref _researchPoints))
             {
                 Reputation += 0.1f;
             }
