@@ -11,6 +11,7 @@ namespace NightclubSim
         public int Money { get; set; }
         public int Level { get; set; }
         public int Experience { get; set; }
+        public float Rating { get; set; }
         public List<SavedTile> Tiles { get; set; } = new();
         public List<SavedStaff> Staff { get; set; } = new();
     }
@@ -22,13 +23,14 @@ namespace NightclubSim
     {
         private const string FileName = "club_save.json";
 
-        public static void Save(World world, Economy economy, List<Staff> staff)
+        public static void Save(World world, Economy economy, List<Staff> staff, float rating)
         {
             var data = new SaveData
             {
                 Money = economy.Money,
                 Level = economy.Level,
                 Experience = economy.Experience,
+                Rating = rating
             };
             foreach (var tile in world.Tiles())
             {
@@ -42,8 +44,9 @@ namespace NightclubSim
             File.WriteAllText(FileName, json);
         }
 
-        public static bool TryLoad(World world, Economy economy, List<Staff> staff)
+        public static bool TryLoad(World world, Economy economy, List<Staff> staff, out float rating)
         {
+            rating = 1f;
             if (!File.Exists(FileName)) return false;
             try
             {
@@ -51,6 +54,7 @@ namespace NightclubSim
                 var data = JsonSerializer.Deserialize<SaveData>(json);
                 if (data == null) return false;
                 economy.LoadState(data.Money, data.Level, data.Experience);
+                rating = data.Rating <= 0 ? 1f : data.Rating;
                 foreach (var tile in data.Tiles)
                 {
                     var placeable = tile.Placeable != PlaceableType.None ? Placeable.Create(tile.Placeable) : null;
