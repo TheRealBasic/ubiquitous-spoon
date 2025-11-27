@@ -11,6 +11,13 @@ namespace NightclubSim
         Leaving
     }
 
+    public enum CustomerPreference
+    {
+        Neutral,
+        Drinks,
+        Dance
+    }
+
     public class Customer : Entity
     {
         public CustomerState State = CustomerState.Arriving;
@@ -18,6 +25,12 @@ namespace NightclubSim
         private readonly Random _random;
         private float _patience;
         public bool FrustratedLeave { get; private set; }
+
+        public float Satisfaction { get; set; } = 60f;
+        public CustomerPreference PreferredActivity { get; }
+        public string CurrentActivity { get; private set; } = "Arriving";
+        public bool IsSelected { get; set; }
+        private float _thoughtTimer;
 
         public Customer(Random rng, Point spawn)
         {
@@ -29,6 +42,8 @@ namespace NightclubSim
             MoveInterval = 0.45f;
             _patience = 30f + (float)_random.NextDouble() * 10f;
             FrustratedLeave = false;
+            PreferredActivity = (CustomerPreference)_random.Next(0, 3);
+            _thoughtTimer = 2.5f + (float)_random.NextDouble() * 3f;
         }
 
         public override void Update(GameTime gameTime, World world)
@@ -42,6 +57,7 @@ namespace NightclubSim
                     {
                         State = CustomerState.Wandering;
                         PickRandomTarget(world);
+                        CurrentActivity = "Looking around";
                     }
                     break;
                 case CustomerState.Wandering:
@@ -54,10 +70,18 @@ namespace NightclubSim
                             _useTimer = 3f + (float)_random.NextDouble() * 5f;
                             _patience = 35f + (float)_random.NextDouble() * 10f;
                             FrustratedLeave = false;
+                            CurrentActivity = tile.Type switch
+                            {
+                                TileType.Bar => "At Bar",
+                                TileType.DanceFloor => "On Dance Floor",
+                                TileType.Table => "Sitting",
+                                _ => "Wandering"
+                            };
                         }
                         else
                         {
                             PickRandomTarget(world);
+                            CurrentActivity = "Looking for Seat";
                         }
                     }
                     break;
@@ -67,6 +91,7 @@ namespace NightclubSim
                     {
                         State = CustomerState.Wandering;
                         PickRandomTarget(world);
+                        CurrentActivity = "Moving";
                     }
                     break;
                 case CustomerState.Leaving:
@@ -85,6 +110,12 @@ namespace NightclubSim
                     State = CustomerState.Leaving;
                     TargetPosition = new Vector2(world.Entrance.X, world.Entrance.Y);
                     FrustratedLeave = true;
+                    CurrentActivity = "Leaving";
+                }
+            }
+
+            UpdateSatisfaction(dt, world);
+            _thoughtTimer -= dt;
                 }
             }
         }
@@ -114,6 +145,66 @@ namespace NightclubSim
                 }
             }
             TargetPosition = GridPosition;
+        }
+
+        private void UpdateSatisfaction(float dt, World world)
+        {
+            float delta = -5f * dt; // boredom baseline
+            var tile = world.GetTile((int)GridPosition.X, (int)GridPosition.Y);
+            if (tile.Type == TileType.Bar)
+            {
+                delta += 9f * dt;
+                if (PreferredActivity == CustomerPreference.Drinks) delta += 5f * dt;
+            }
+            else if (tile.Type == TileType.DanceFloor)
+            {
+                delta += 10f * dt;
+                if (PreferredActivity == CustomerPreference.Dance) delta += 6f * dt;
+            }
+            else if (tile.Type == TileType.Table)
+            {
+                delta += 3f * dt;
+            }
+
+            // Nearby decor bonus
+            int decorNearby = 0;
+            foreach (var offset in new[] { new Point(1, 0), new Point(-1, 0), new Point(0, 1), new Point(0, -1) })
+            {
+                int nx = (int)GridPosition.X + offset.X;
+                int ny = (int)GridPosition.Y + offset.Y;
+                if (world.IsInside(nx, ny))
+                {
+                    var t = world.GetTile(nx, ny);
+                    if (t.Type == TileType.Decor) decorNearby++;
+                }
+            }
+            delta += decorNearby * 1.5f * dt;
+
+            Satisfaction = MathHelper.Clamp(Satisfaction + delta, 0f, 100f);
+
+            if (Satisfaction <= 5f && State != CustomerState.Leaving)
+            {
+                State = CustomerState.Leaving;
+                TargetPosition = new Vector2(world.Entrance.X, world.Entrance.Y);
+                FrustratedLeave = true;
+                CurrentActivity = "Leaving";
+            }
+        }
+
+        public string GetMoodDescription()
+        {
+            if (Satisfaction >= 80f) return "Loving it!";
+            if (Satisfaction >= 60f) return PreferredActivity == CustomerPreference.Dance ? "Enjoying the beats" : "Feeling good";
+            if (Satisfaction >= 40f) return "Wants a drink";
+            if (Satisfaction >= 20f) return "Bored...";
+            return "About to leave";
+        }
+
+        public bool ShouldShowThought() => _thoughtTimer <= 0f;
+
+        public void ResetThoughtTimer()
+        {
+            _thoughtTimer = 2.5f + (float)_random.NextDouble() * 4f;
         }
     }
 }
