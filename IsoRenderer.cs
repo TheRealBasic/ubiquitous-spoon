@@ -34,13 +34,13 @@ namespace NightclubSim
             var pos = ToScreen(tile.GridPosition.X, tile.GridPosition.Y);
             var color = tile.Type switch
             {
-                TileType.Wall => Color.DarkSlateGray,
-                TileType.Entrance => Color.OrangeRed,
-                TileType.DanceFloor => Color.MediumPurple,
-                TileType.Bar => Color.SaddleBrown,
-                TileType.Table => Color.Maroon,
-                TileType.Decor => Color.LimeGreen,
-                _ => Color.Gray
+                TileType.Wall => new Color(35, 35, 50),
+                TileType.Entrance => new Color(255, 120, 60),
+                TileType.DanceFloor => new Color(175, 120, 255),
+                TileType.Bar => new Color(140, 90, 60),
+                TileType.Table => new Color(140, 40, 60),
+                TileType.Decor => new Color(60, 200, 120),
+                _ => new Color(110, 110, 120)
             };
             spriteBatch.Draw(tileTexture, pos, null, color, 0f, new Vector2(tileTexture.Width / 2f, tileTexture.Height / 2f), Zoom, SpriteEffects.None, 0f);
         }
