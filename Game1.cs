@@ -477,12 +477,6 @@ namespace NightclubSim
             return 18 + bouncers * 5;
         }
 
-        private int MaxCustomerCount()
-        {
-            int bouncers = _staff.Count(s => s.Role == StaffRole.Bouncer);
-            return 18 + bouncers * 5;
-        }
-
         private void UpdateCustomers(GameTime gameTime)
         {
             float incomeThisFrame = 0f;
