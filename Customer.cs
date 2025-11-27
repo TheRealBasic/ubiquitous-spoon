@@ -116,6 +116,8 @@ namespace NightclubSim
 
             UpdateSatisfaction(dt, world);
             _thoughtTimer -= dt;
+                }
+            }
         }
 
         public bool ReachedTarget()
