@@ -13,6 +13,13 @@ namespace NightclubSim
     {
         public StaffRole Role { get; }
         public Vector2 GridPosition { get; }
+        public int HireCost => Role switch
+        {
+            StaffRole.Bartender => 250,
+            StaffRole.DJ => 300,
+            StaffRole.Bouncer => 200,
+            _ => 150
+        };
         public Color Color => Role switch
         {
             StaffRole.Bartender => Color.DarkOrange,
