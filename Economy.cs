@@ -9,11 +9,14 @@ namespace NightclubSim
         public int Experience { get; private set; } = 0;
         public int ExperienceToNext => 100 + (Level - 1) * 50;
 
+        public bool Sandbox { get; set; }
+
         public event Action<string>? Log;
         public event Action<int>? LevelledUp;
 
         public bool Spend(int amount)
         {
+            if (Sandbox) return true;
             if (Money < amount) return false;
             Money -= amount;
             return true;

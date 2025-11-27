@@ -33,6 +33,10 @@ namespace NightclubSim
         private float _thoughtTimer;
         public bool IsVip { get; }
         public float TimeInClub { get; private set; }
+        public float Energy { get; private set; } = 80f;
+        public float Comfort { get; private set; } = 70f;
+        public float Thirst { get; private set; } = 30f;
+        public float SafetyNeed { get; private set; } = 70f;
 
         public Customer(Random rng, Point spawn, bool vip = false, float startingSatisfaction = 60f)
         {
@@ -153,20 +157,29 @@ namespace NightclubSim
         private void UpdateSatisfaction(float dt, World world)
         {
             float delta = -5f * dt; // boredom baseline
+            Energy = MathHelper.Clamp(Energy - dt * 2f, 0f, 100f);
+            Thirst = MathHelper.Clamp(Thirst + dt * 3f, 0f, 100f);
+            Comfort = MathHelper.Clamp(Comfort - dt * 1.5f, 0f, 100f);
+            SafetyNeed = MathHelper.Clamp(SafetyNeed - dt, 0f, 100f);
             var tile = world.GetTile((int)GridPosition.X, (int)GridPosition.Y);
             if (tile.Type == TileType.Bar)
             {
                 delta += 9f * dt;
                 if (PreferredActivity == CustomerPreference.Drinks) delta += 5f * dt;
+                Thirst = MathHelper.Clamp(Thirst - dt * 12f, 0f, 100f);
+                Energy = MathHelper.Clamp(Energy + dt * 2f, 0f, 100f);
             }
             else if (tile.Type == TileType.DanceFloor)
             {
                 delta += 10f * dt;
                 if (PreferredActivity == CustomerPreference.Dance) delta += 6f * dt;
+                Energy = MathHelper.Clamp(Energy - dt * 4f, 0f, 100f);
+                Comfort = MathHelper.Clamp(Comfort + dt * 2f, 0f, 100f);
             }
             else if (tile.Type == TileType.Table)
             {
                 delta += 3f * dt;
+                Comfort = MathHelper.Clamp(Comfort + dt * 4f, 0f, 100f);
             }
 
             // Nearby decor bonus
@@ -182,6 +195,10 @@ namespace NightclubSim
                 }
             }
             delta += decorNearby * 1.5f * dt;
+            delta += (Energy - 50f) * 0.006f * dt;
+            delta += (Comfort - 50f) * 0.008f * dt;
+            delta += (100f - Thirst) * 0.004f * dt;
+            delta += (SafetyNeed - 50f) * 0.005f * dt;
 
             Satisfaction = MathHelper.Clamp(Satisfaction + delta, 0f, 100f);
 
