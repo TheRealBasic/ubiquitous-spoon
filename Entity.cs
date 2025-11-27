@@ -8,15 +8,25 @@ namespace NightclubSim
         public Vector2 TargetPosition;
         public float MoveTimer;
         public float MoveInterval = 0.3f;
+        public Vector2 PreviousPosition;
+        public Vector2 SmoothPosition;
+        public float LerpTimer;
 
         public virtual void Update(GameTime gameTime, World world)
         {
-            MoveTimer -= (float)gameTime.ElapsedGameTime.TotalSeconds;
+            float dt = (float)gameTime.ElapsedGameTime.TotalSeconds;
+            MoveTimer -= dt;
+            LerpTimer += dt;
             if (MoveTimer <= 0f)
             {
+                PreviousPosition = GridPosition;
                 StepTowardsTarget(world);
                 MoveTimer = MoveInterval;
+                LerpTimer = 0f;
             }
+
+            float progress = MoveInterval <= 0f ? 1f : MathHelper.Clamp(LerpTimer / MoveInterval, 0f, 1f);
+            SmoothPosition = Vector2.Lerp(PreviousPosition, GridPosition, progress);
         }
 
         protected void StepTowardsTarget(World world)
