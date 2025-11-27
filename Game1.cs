@@ -281,7 +281,7 @@ namespace NightclubSim
             AddLog($"Selected {_selectedPlacement}.");
         }
 
-        private void HandleMouse(MouseState mouse)
+        private void HandleBuildSelectionInput(KeyboardState keyboard)
         {
             var mousePos = new Vector2(mouse.X, mouse.Y);
             var grid = _iso.ToGrid(mousePos);
@@ -327,24 +327,150 @@ namespace NightclubSim
             {
                 if (_buildTab == BuildTab.Items)
                 {
-                    var placeable = Placeable.Create(_selectedPlacement);
-                    if (_economy.Level < placeable.LevelRequirement)
+                    Keys key = Keys.D1 + i;
+                    if (keyboard.IsKeyDown(key) && !_previousKeyboard.IsKeyDown(key))
                     {
-                        AddLog("Level too low.");
+                        _selectedPlacement = (PlaceableType)(i + 1);
+                        AddLog($"Selected {_selectedPlacement}.");
                     }
-                    else if (!_world.CanPlace(grid.X, grid.Y))
+                }
+                if (keyboard.IsKeyDown(Keys.Q) && !_previousKeyboard.IsKeyDown(Keys.Q))
+                {
+                    CyclePlacement(-1, itemCount);
+                }
+                if (keyboard.IsKeyDown(Keys.E) && !_previousKeyboard.IsKeyDown(Keys.E))
+                {
+                    CyclePlacement(1, itemCount);
+                }
+            }
+            else
+            {
+                StaffRole[] roles = { StaffRole.Bartender, StaffRole.DJ, StaffRole.Bouncer };
+                for (int i = 0; i < roles.Length; i++)
+                {
+                    Keys key = Keys.D1 + i;
+                    if (keyboard.IsKeyDown(key) && !_previousKeyboard.IsKeyDown(key))
                     {
-                        AddLog("Cannot build here.");
+                        _selectedStaff = roles[i];
+                        AddLog($"Hiring {_selectedStaff} selected.");
                     }
-                    else if (!_economy.Spend(placeable.Cost))
+                }
+            }
+        }
+
+        private void CyclePlacement(int direction, int itemCount)
+        {
+            int idx = (int)_selectedPlacement - 1;
+            idx = (idx + direction + itemCount) % itemCount;
+            _selectedPlacement = (PlaceableType)(idx + 1);
+            AddLog($"Selected {_selectedPlacement}.");
+        }
+
+        private void HandleBuildSelectionInput(KeyboardState keyboard)
+        {
+            if (_mode != GameMode.Build) return;
+            int itemCount = Enum.GetValues(typeof(PlaceableType)).Length - 1;
+            for (int i = 0; i < itemCount; i++)
+            {
+                Keys key = Keys.D1 + i;
+                if (keyboard.IsKeyDown(key) && !_previousKeyboard.IsKeyDown(key))
+                {
+                    _selectedPlacement = (PlaceableType)(i + 1);
+                    AddLog($"Selected {_selectedPlacement}.");
+                }
+            }
+            if (keyboard.IsKeyDown(Keys.Q) && !_previousKeyboard.IsKeyDown(Keys.Q))
+            {
+                CyclePlacement(-1, itemCount);
+            }
+            if (keyboard.IsKeyDown(Keys.E) && !_previousKeyboard.IsKeyDown(Keys.E))
+            {
+                CyclePlacement(1, itemCount);
+            }
+        }
+
+        private void CyclePlacement(int direction, int itemCount)
+        {
+            int idx = (int)_selectedPlacement - 1;
+            idx = (idx + direction + itemCount) % itemCount;
+            _selectedPlacement = (PlaceableType)(idx + 1);
+            AddLog($"Selected {_selectedPlacement}.");
+        }
+
+        private void HandleMouse(MouseState mouse)
+        {
+            var mousePos = new Vector2(mouse.X, mouse.Y);
+            var grid = _iso.ToGrid(mousePos);
+
+            int scrollDelta = mouse.ScrollWheelValue - _previousMouse.ScrollWheelValue;
+            if (scrollDelta != 0)
+            {
+                _iso.Zoom = MathHelper.Clamp(_iso.Zoom + scrollDelta * 0.0015f, 0.6f, 1.8f);
+            }
+
+            if (mouse.RightButton == ButtonState.Pressed)
+            {
+                if (_previousMouse.RightButton == ButtonState.Released)
+                {
+                    _cameraDragging = true;
+                    _rightClickConsumed = false;
+                    _dragStart = mousePos;
+                    _cameraStart = _iso.Camera;
+                }
+                else if (_cameraDragging)
+                {
+                    var delta = mousePos - _dragStart;
+                    if (delta.LengthSquared() > 25f) _rightClickConsumed = true;
+                    _iso.Camera = _cameraStart + delta;
+                }
+            }
+            else if (_previousMouse.RightButton == ButtonState.Pressed)
+            {
+                bool treatAsClick = !_rightClickConsumed && _mode == GameMode.Build;
+                _cameraDragging = false;
+                if (treatAsClick)
+                {
+                    if (!_world.IsInside(grid.X, grid.Y)) return;
+                    var staffTemplate = new Staff(_selectedStaff, Vector2.Zero);
+                    if (!_economy.Spend(staffTemplate.HireCost))
                     {
-                        AddLog("Not enough money.");
+                        AddLog("Not enough money to hire.");
+                        return;
                     }
-                    else
+                    if (!IsValidStaffPlacement(_selectedStaff, grid))
                     {
-                        _world.Place(grid.X, grid.Y, placeable);
-                        AddLog($"Placed {placeable.Name}.");
+                        AddLog("Invalid spot for staff.");
+                        _economy.AddIncome(staffTemplate.HireCost); // refund immediately
+                        return;
                     }
+                    _staff.Add(new Staff(_selectedStaff, new Vector2(grid.X, grid.Y)));
+                    AddLog($"Hired {_selectedStaff}.");
+                }
+            }
+
+            var leftClick = mouse.LeftButton == ButtonState.Pressed && _previousMouse.LeftButton == ButtonState.Released;
+            if (_mode == GameMode.Build && leftClick)
+            {
+                if (_buildTab == BuildTab.Items)
+            {
+                _iso.Zoom = MathHelper.Clamp(_iso.Zoom + scrollDelta * 0.0015f, 0.6f, 1.8f);
+            }
+
+            if (mouse.RightButton == ButtonState.Pressed)
+            {
+                if (_previousMouse.RightButton == ButtonState.Released)
+                {
+                    _cameraDragging = true;
+                    _rightClickConsumed = false;
+                    _dragStart = mousePos;
+                    _cameraStart = _iso.Camera;
+                }
+                else
+                else if (_cameraDragging)
+                {
+                    var delta = mousePos - _dragStart;
+                    if (delta.LengthSquared() > 25f) _rightClickConsumed = true;
+                    _iso.Camera = _cameraStart + delta;
                 }
                 else
                 {
@@ -471,6 +597,12 @@ namespace NightclubSim
             _economy.AddIncome(entryFee);
             _sessionMoneyEarned += entryFee;
             _floatingTexts.Add(new FloatingText($"+${entryFee}", _iso.ToScreen(tile.X, tile.Y) - new Vector2(0, 20), Color.LimeGreen, 1.1f, 1.1f));
+        }
+
+        private int MaxCustomerCount()
+        {
+            int bouncers = _staff.Count(s => s.Role == StaffRole.Bouncer);
+            return 18 + bouncers * 5;
         }
 
         private int MaxCustomerCount()
