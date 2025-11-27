@@ -78,9 +78,12 @@ namespace NightclubSim
 
         protected override void Initialize()
         {
-            _graphics.PreferredBackBufferWidth = 1280;
-            _graphics.PreferredBackBufferHeight = 720;
+            _graphics.HardwareModeSwitch = false;
+            Window.IsBorderless = true;
+            _graphics.PreferredBackBufferWidth = 3840;
+            _graphics.PreferredBackBufferHeight = 2160;
             _graphics.ApplyChanges();
+            _iso.Origin = new Vector2(_graphics.PreferredBackBufferWidth / 2f, _graphics.PreferredBackBufferHeight / 4f);
             _world = new World(16, 12);
             _economy.Log += AddLog;
             base.Initialize();
@@ -90,8 +93,8 @@ namespace NightclubSim
         {
             _spriteBatch = new SpriteBatch(GraphicsDevice);
             _font = new PixelFont(GraphicsDevice);
-            _tileTexture = TextureFactory.CreateDiamond(GraphicsDevice, _iso.TileWidth, _iso.TileHeight);
-            _entityTexture = TextureFactory.CreateRectangle(GraphicsDevice, 12, 18, Color.White);
+            _tileTexture = TextureFactory.CreateShadedDiamond(GraphicsDevice, _iso.TileWidth, _iso.TileHeight);
+            _entityTexture = TextureFactory.CreateCharacter(GraphicsDevice, 12, 20);
             _panelTexture = TextureFactory.CreateRectangle(GraphicsDevice, 1, 1, new Color(0, 0, 0, 0.5f));
 
             _economy.LevelledUp += level =>
@@ -641,9 +644,9 @@ namespace NightclubSim
             // Staff
             foreach (var staff in _staff)
             {
-                var pos = _iso.ToScreen((int)staff.GridPosition.X, (int)staff.GridPosition.Y) - new Vector2(0, 6);
-                DrawShadow(pos + new Vector2(0, 16));
-                _spriteBatch.Draw(_entityTexture, pos, null, staff.Color, 0f, new Vector2(_entityTexture.Width / 2f, _entityTexture.Height), _iso.Zoom, SpriteEffects.None, 0f);
+                var foot = _iso.ToScreen((int)staff.GridPosition.X, (int)staff.GridPosition.Y);
+                DrawShadow(foot + new Vector2(0, _iso.TileHeight * 0.2f));
+                _spriteBatch.Draw(_entityTexture, foot, null, staff.Color, 0f, new Vector2(_entityTexture.Width / 2f, _entityTexture.Height), _iso.Zoom, SpriteEffects.None, 0f);
             }
 
             Customer? hovered = null;
@@ -651,9 +654,9 @@ namespace NightclubSim
             foreach (var c in _customers)
             {
                 var tile = _world.GetTile((int)c.GridPosition.X, (int)c.GridPosition.Y);
-                var pos = _iso.ToScreen((int)c.SmoothPosition.X, (int)c.SmoothPosition.Y) - new Vector2(0, 8);
-                DrawShadow(pos + new Vector2(0, 18));
-                _spriteBatch.Draw(_entityTexture, pos, null, Color.Cyan, 0f, new Vector2(_entityTexture.Width / 2f, _entityTexture.Height), _iso.Zoom, SpriteEffects.None, 0f);
+                var foot = _iso.ToScreen((int)c.SmoothPosition.X, (int)c.SmoothPosition.Y);
+                DrawShadow(foot + new Vector2(0, _iso.TileHeight * 0.2f));
+                _spriteBatch.Draw(_entityTexture, foot, null, Color.Cyan, 0f, new Vector2(_entityTexture.Width / 2f, _entityTexture.Height), _iso.Zoom, SpriteEffects.None, 0f);
                 if (c.IsSelected)
                 {
                     _spriteBatch.Draw(_tileTexture, _iso.ToScreen((int)c.GridPosition.X, (int)c.GridPosition.Y), null, new Color(0, 200, 255, 80), 0f, new Vector2(_tileTexture.Width / 2f, _tileTexture.Height / 2f), _iso.Zoom * 1.1f, SpriteEffects.None, 0f);
@@ -880,7 +883,10 @@ namespace NightclubSim
 
         private void DrawShadow(Vector2 pos)
         {
-            _spriteBatch.Draw(_panelTexture, new Rectangle((int)pos.X - 8, (int)pos.Y, 16, 6), new Color(0, 0, 0, 100));
+            var width = 20;
+            var height = 8;
+            _spriteBatch.Draw(_panelTexture, new Rectangle((int)pos.X - width / 2, (int)pos.Y, width, height), new Color(0, 0, 0, 120));
+            _spriteBatch.Draw(_panelTexture, new Rectangle((int)pos.X - width / 2, (int)pos.Y + height / 2, width, height / 2), new Color(0, 0, 0, 90));
         }
 
         private void AddLog(string message)
