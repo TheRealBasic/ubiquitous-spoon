@@ -24,7 +24,7 @@ namespace NightclubSim
         private Texture2D _panelTexture = null!;
 
         private Economy _economy = new();
-        private GameMode _mode = GameMode.Live;
+        private GameMode _mode = GameMode.Build;
         private bool _clubOpen = true;
         private float _timeOfDay = 18f; // start at evening
         private readonly List<string> _log = new();
@@ -35,6 +35,13 @@ namespace NightclubSim
 
         private double _spawnTimer = 0;
         private PlaceableType _selectedPlacement = PlaceableType.BarCounter;
+        private float _incomeBuffer;
+        private float _xpBuffer;
+        private float _autosaveTimer = 60f;
+        private bool _cameraDragging;
+        private bool _rightClickConsumed;
+        private Vector2 _dragStart;
+        private Vector2 _cameraStart;
 
         private MouseState _previousMouse;
         private KeyboardState _previousKeyboard;
@@ -88,6 +95,7 @@ namespace NightclubSim
             float dt = (float)gameTime.ElapsedGameTime.TotalSeconds;
             HandleCameraInput(dt, keyboard);
             HandleModeInput(keyboard);
+            HandleBuildSelectionInput(keyboard);
 
             var mouse = Mouse.GetState();
             HandleMouse(mouse);
@@ -97,6 +105,14 @@ namespace NightclubSim
                 UpdateTime(dt);
                 UpdateCustomers(gameTime);
                 SpawnCustomers(dt);
+            }
+
+            _autosaveTimer -= dt;
+            if (_autosaveTimer <= 0f)
+            {
+                SaveManager.Save(_world, _economy, _staff);
+                AddLog("Auto-saved.");
+                _autosaveTimer = 60f;
             }
 
             _previousMouse = mouse;
@@ -155,42 +171,98 @@ namespace NightclubSim
             }
         }
 
+        private void HandleBuildSelectionInput(KeyboardState keyboard)
+        {
+            if (_mode != GameMode.Build) return;
+            int itemCount = Enum.GetValues(typeof(PlaceableType)).Length - 1;
+            for (int i = 0; i < itemCount; i++)
+            {
+                Keys key = Keys.D1 + i;
+                if (keyboard.IsKeyDown(key) && !_previousKeyboard.IsKeyDown(key))
+                {
+                    _selectedPlacement = (PlaceableType)(i + 1);
+                    AddLog($"Selected {_selectedPlacement}.");
+                }
+            }
+            if (keyboard.IsKeyDown(Keys.Q) && !_previousKeyboard.IsKeyDown(Keys.Q))
+            {
+                CyclePlacement(-1, itemCount);
+            }
+            if (keyboard.IsKeyDown(Keys.E) && !_previousKeyboard.IsKeyDown(Keys.E))
+            {
+                CyclePlacement(1, itemCount);
+            }
+        }
+
+        private void CyclePlacement(int direction, int itemCount)
+        {
+            int idx = (int)_selectedPlacement - 1;
+            idx = (idx + direction + itemCount) % itemCount;
+            _selectedPlacement = (PlaceableType)(idx + 1);
+            AddLog($"Selected {_selectedPlacement}.");
+        }
+
         private void HandleMouse(MouseState mouse)
         {
-            var leftClick = mouse.LeftButton == ButtonState.Pressed && _previousMouse.LeftButton == ButtonState.Released;
-            var rightClick = mouse.RightButton == ButtonState.Pressed && _previousMouse.RightButton == ButtonState.Released;
+            var mousePos = new Vector2(mouse.X, mouse.Y);
+            var grid = _iso.ToGrid(mousePos);
 
-            var grid = _iso.ToGrid(new Vector2(mouse.X, mouse.Y));
-            if (_mode == GameMode.Build)
+            int scrollDelta = mouse.ScrollWheelValue - _previousMouse.ScrollWheelValue;
+            if (scrollDelta != 0)
             {
-                if (leftClick)
+                _iso.Zoom = MathHelper.Clamp(_iso.Zoom + scrollDelta * 0.0015f, 0.6f, 1.8f);
+            }
+
+            if (mouse.RightButton == ButtonState.Pressed)
+            {
+                if (_previousMouse.RightButton == ButtonState.Released)
                 {
-                    var placeable = Placeable.Create(_selectedPlacement);
-                    if (_economy.Level < placeable.LevelRequirement)
-                    {
-                        AddLog("Level too low.");
-                    }
-                    else if (!_world.CanPlace(grid.X, grid.Y))
-                    {
-                        AddLog("Cannot build here.");
-                    }
-                    else if (!_economy.Spend(placeable.Cost))
-                    {
-                        AddLog("Not enough money.");
-                    }
-                    else
-                    {
-                        _world.Place(grid.X, grid.Y, placeable);
-                        AddLog($"Placed {placeable.Name}.");
-                    }
+                    _cameraDragging = true;
+                    _rightClickConsumed = false;
+                    _dragStart = mousePos;
+                    _cameraStart = _iso.Camera;
                 }
-                if (rightClick)
+                else if (_cameraDragging)
+                {
+                    var delta = mousePos - _dragStart;
+                    if (delta.LengthSquared() > 25f) _rightClickConsumed = true;
+                    _iso.Camera = _cameraStart + delta;
+                }
+            }
+            else if (_previousMouse.RightButton == ButtonState.Pressed)
+            {
+                bool treatAsClick = !_rightClickConsumed && _mode == GameMode.Build;
+                _cameraDragging = false;
+                if (treatAsClick)
                 {
                     if (_world.Remove(grid.X, grid.Y))
                     {
                         _economy.AddIncome(10); // small refund
                         AddLog("Item sold.");
                     }
+                }
+            }
+
+            var leftClick = mouse.LeftButton == ButtonState.Pressed && _previousMouse.LeftButton == ButtonState.Released;
+            if (_mode == GameMode.Build && leftClick)
+            {
+                var placeable = Placeable.Create(_selectedPlacement);
+                if (_economy.Level < placeable.LevelRequirement)
+                {
+                    AddLog("Level too low.");
+                }
+                else if (!_world.CanPlace(grid.X, grid.Y))
+                {
+                    AddLog("Cannot build here.");
+                }
+                else if (!_economy.Spend(placeable.Cost))
+                {
+                    AddLog("Not enough money.");
+                }
+                else
+                {
+                    _world.Place(grid.X, grid.Y, placeable);
+                    AddLog($"Placed {placeable.Name}.");
                 }
             }
         }
@@ -220,6 +292,7 @@ namespace NightclubSim
         private void UpdateCustomers(GameTime gameTime)
         {
             float incomeThisFrame = 0f;
+            float xpThisFrame = 0f;
             for (int i = _customers.Count - 1; i >= 0; i--)
             {
                 var c = _customers[i];
@@ -234,16 +307,33 @@ namespace NightclubSim
                         bonus += 0.25f * _staff.FindAll(s => s.Role == StaffRole.DJ).Count;
                     if (tile.Type == TileType.Table)
                         bonus += 0.1f * _staff.Count;
-                    incomeThisFrame += bonus * (tile.Type == TileType.Bar ? 5 : tile.Type == TileType.DanceFloor ? 3 : 2) * (float)gameTime.ElapsedGameTime.TotalSeconds;
+                    float earnRate = (tile.Type == TileType.Bar ? 5 : tile.Type == TileType.DanceFloor ? 3 : 2);
+                    incomeThisFrame += bonus * earnRate * (float)gameTime.ElapsedGameTime.TotalSeconds;
+                    xpThisFrame += (bonus * 0.5f) * (float)gameTime.ElapsedGameTime.TotalSeconds;
                 }
                 if (c.State == CustomerState.Leaving && c.ReachedTarget())
                 {
+                    if (c.FrustratedLeave)
+                    {
+                        AddLog("A guest left unhappy.");
+                    }
                     _customers.RemoveAt(i);
                 }
             }
-            if (incomeThisFrame > 0)
+
+            _incomeBuffer += incomeThisFrame;
+            _xpBuffer += xpThisFrame;
+            int incomeDelta = (int)Math.Floor(_incomeBuffer);
+            if (incomeDelta > 0)
             {
-                _economy.AddIncome((int)Math.Round(incomeThisFrame));
+                _economy.AddIncome(incomeDelta);
+                _incomeBuffer -= incomeDelta;
+            }
+            int xpDelta = (int)Math.Floor(_xpBuffer);
+            if (xpDelta > 0)
+            {
+                _economy.GrantXp(xpDelta);
+                _xpBuffer -= xpDelta;
             }
         }
 
@@ -270,10 +360,11 @@ namespace NightclubSim
 
             foreach (var c in _customers)
             {
-                var pos = _iso.ToScreen((int)c.GridPosition.X, (int)c.GridPosition.Y) - new Vector2(0, 8);
+                var pos = _iso.ToScreen((int)c.SmoothPosition.X, (int)c.SmoothPosition.Y) - new Vector2(0, 8);
                 _spriteBatch.Draw(_entityTexture, pos, null, Color.Cyan, 0f, new Vector2(_entityTexture.Width / 2f, _entityTexture.Height), _iso.Zoom, SpriteEffects.None, 0f);
             }
 
+            DrawBuildPreview(Mouse.GetState());
             DrawUI();
 
             _spriteBatch.End();
@@ -291,9 +382,18 @@ namespace NightclubSim
             _font.DrawString(_spriteBatch, $"TIME: {(int)_timeOfDay:00}:00 {dayState}", new Vector2(10, 50), Color.Gold, 2f);
             _font.DrawString(_spriteBatch, $"MODE: {_mode} | CLUB: {(_clubOpen ? "OPEN" : "CLOSED")}", new Vector2(260, 10), Color.White, 2f);
             _font.DrawString(_spriteBatch, "TAB SWITCH, O OPEN, N NEW, F5 SAVE", new Vector2(260, 30), Color.LightGray, 1.5f);
+            _font.DrawString(_spriteBatch, $"GUESTS: {_customers.Count} | STAFF: {_staff.Count} | RATING: {ComputeRating():0.0}", new Vector2(260, 50), Color.LightSeaGreen, 1.5f);
 
-            DrawShop(new Vector2(10, 90));
-            DrawLog(new Vector2(10, _graphics.PreferredBackBufferHeight - 100));
+            if (_mode == GameMode.Build)
+            {
+                DrawShop(new Vector2(10, 90));
+            }
+            else
+            {
+                _font.DrawString(_spriteBatch, "Build items hidden (TAB to edit)", new Vector2(10, 90), Color.LightGray, 1.5f);
+            }
+            DrawLog(new Vector2(10, _graphics.PreferredBackBufferHeight - 120));
+            DrawTileTooltip(Mouse.GetState(), new Vector2(10, _graphics.PreferredBackBufferHeight - 150));
         }
 
         private void DrawShop(Vector2 start)
@@ -311,16 +411,43 @@ namespace NightclubSim
                 _font.DrawString(_spriteBatch, line, pos, color, 1.5f);
                 index++;
             }
-            var keyboard = Keyboard.GetState();
-            for (int i = 0; i < index; i++)
+            var selected = Placeable.Create(_selectedPlacement);
+            _font.DrawString(_spriteBatch, $"Selected: {selected.Name}", start + new Vector2(0, 20 + index * 18), Color.LightGoldenrodYellow, 1.5f);
+            _font.DrawString(_spriteBatch, $"Cost: ${selected.Cost} | Needs L{selected.LevelRequirement}", start + new Vector2(0, 38 + index * 18), Color.LightGoldenrodYellow, 1.3f);
+        }
+
+        private void DrawTileTooltip(MouseState mouse, Vector2 start)
+        {
+            var grid = _iso.ToGrid(new Vector2(mouse.X, mouse.Y));
+            if (!_world.IsInside(grid.X, grid.Y)) return;
+            var tile = _world.GetTile(grid.X, grid.Y);
+            string occupant = tile.PlacedObject != null ? $" ({tile.PlacedObject.Name})" : string.Empty;
+            _font.DrawString(_spriteBatch, $"Hover: {tile.Type}{occupant}", start, Color.LightSteelBlue, 1.2f);
+        }
+
+        private void DrawBuildPreview(MouseState mouse)
+        {
+            if (_mode != GameMode.Build) return;
+            var grid = _iso.ToGrid(new Vector2(mouse.X, mouse.Y));
+            if (!_world.IsInside(grid.X, grid.Y)) return;
+            var placeable = Placeable.Create(_selectedPlacement);
+            bool valid = _economy.Level >= placeable.LevelRequirement && _world.CanPlace(grid.X, grid.Y) && _economy.Money >= placeable.Cost;
+            var pos = _iso.ToScreen(grid.X, grid.Y);
+            var color = (valid ? Color.LimeGreen : Color.Red) * 0.4f;
+            _spriteBatch.Draw(_tileTexture, pos, null, color, 0f, new Vector2(_tileTexture.Width / 2f, _tileTexture.Height / 2f), _iso.Zoom * 1.05f, SpriteEffects.None, 0f);
+        }
+
+        private float ComputeRating()
+        {
+            int decor = 0, dance = 0, bar = 0;
+            foreach (var tile in _world.Tiles())
             {
-                Keys key = Keys.D1 + i;
-                if (keyboard.IsKeyDown(key) && !_previousKeyboard.IsKeyDown(key))
-                {
-                    _selectedPlacement = (PlaceableType)(i + 1);
-                    AddLog($"Selected {_selectedPlacement}.");
-                }
+                if (tile.Type == TileType.Decor) decor++;
+                if (tile.Type == TileType.DanceFloor) dance++;
+                if (tile.Type == TileType.Bar) bar++;
             }
+            float rating = 1f + decor * 0.05f + dance * 0.07f + bar * 0.05f + _staff.Count * 0.05f;
+            return MathHelper.Clamp(rating, 1f, 5f);
         }
 
         private void DrawLog(Vector2 start)
@@ -335,7 +462,7 @@ namespace NightclubSim
         private void AddLog(string message)
         {
             _log.Add(message);
-            if (_log.Count > 6) _log.RemoveAt(0);
+            if (_log.Count > 8) _log.RemoveAt(0);
         }
     }
 }

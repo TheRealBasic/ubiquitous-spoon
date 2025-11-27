@@ -16,18 +16,25 @@ namespace NightclubSim
         public CustomerState State = CustomerState.Arriving;
         private float _useTimer = 0f;
         private readonly Random _random;
+        private float _patience;
+        public bool FrustratedLeave { get; private set; }
 
         public Customer(Random rng, Point spawn)
         {
             _random = rng;
             GridPosition = new Vector2(spawn.X, spawn.Y);
             TargetPosition = GridPosition + new Vector2(0, -1);
-            MoveInterval = 0.25f;
+            PreviousPosition = GridPosition;
+            SmoothPosition = GridPosition;
+            MoveInterval = 0.45f;
+            _patience = 30f + (float)_random.NextDouble() * 10f;
+            FrustratedLeave = false;
         }
 
         public override void Update(GameTime gameTime, World world)
         {
             base.Update(gameTime, world);
+            float dt = (float)gameTime.ElapsedGameTime.TotalSeconds;
             switch (State)
             {
                 case CustomerState.Arriving:
@@ -45,6 +52,8 @@ namespace NightclubSim
                         {
                             State = CustomerState.Using;
                             _useTimer = 3f + (float)_random.NextDouble() * 5f;
+                            _patience = 35f + (float)_random.NextDouble() * 10f;
+                            FrustratedLeave = false;
                         }
                         else
                         {
@@ -53,7 +62,7 @@ namespace NightclubSim
                     }
                     break;
                 case CustomerState.Using:
-                    _useTimer -= (float)gameTime.ElapsedGameTime.TotalSeconds;
+                    _useTimer -= dt;
                     if (_useTimer <= 0f)
                     {
                         State = CustomerState.Wandering;
@@ -67,6 +76,17 @@ namespace NightclubSim
                     }
                     break;
             }
+
+            if (State == CustomerState.Wandering)
+            {
+                _patience -= dt;
+                if (_patience <= 0f)
+                {
+                    State = CustomerState.Leaving;
+                    TargetPosition = new Vector2(world.Entrance.X, world.Entrance.Y);
+                    FrustratedLeave = true;
+                }
+            }
         }
 
         public bool ReachedTarget()
@@ -78,6 +98,7 @@ namespace NightclubSim
         {
             State = CustomerState.Leaving;
             TargetPosition = new Vector2(world.Entrance.X, world.Entrance.Y);
+            FrustratedLeave = false;
         }
 
         private void PickRandomTarget(World world)
