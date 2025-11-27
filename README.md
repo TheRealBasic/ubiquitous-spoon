@@ -46,3 +46,50 @@ Chrome Pulse is a lightweight, isometric nightclub management prototype inspired
 ## Notes
 - Graphics are simple procedurally generated shapes; no external assets are required.
 - The UI uses a built-in pixel font drawn via rectangles to avoid asset dependencies.
+
+## Implemented Roadmap Features
+All roadmap items below are now playable or surfaced in the simulation (everything except the excluded tutorial/campaign and mod/localization/accessibility/keybinding/replay requests).
+
+1. Sandbox build toggle (F6) that removes spending limits for creative building.
+2. Research tree nodes for decor, safety, and marketing unlocks with point costs.
+3. Dynamic ambience pass with soft vignette lighting tied to placeable fixtures.
+4. Layered audio readiness through zone-aware hype multipliers and playlist BPM.
+5. Weather shifts (clear, rain, heatwave, storm) that influence queues and attendance.
+6. Rope-managed queues that reduce frustration and reward fairness bonuses.
+7. Guest archetypes and VIPs with unique spend rates and mood tuning.
+8. Rotating themed nights that add attendance and satisfaction modifiers.
+9. Marketing campaigns (auto-scheduled social ads) that boost reputation and hype.
+10. Social sentiment and reputation loops that feed into organic attendance.
+11. Ticket pricing levers that respond to demand elasticity and spawn modifiers.
+12. Staff shifts with fatigue, training progression, and personality traits.
+13. Bouncer ID checks and bartender service boosts that affect satisfaction pacing.
+14. DJ playlist BPM tracking that feeds the dance floor hype meter.
+15. Expanded guest mood and needs (energy, comfort, thirst, safety) that steer behavior.
+16. Cleanliness system with trash buildup and informal maintenance coverage.
+17. Security incident hooks plus fire drill resets to keep nights safe.
+18. Equipment and power stability simulation with backup generator recovery.
+19. Inventory tracking with supplier contracts, reliability, and restock delays.
+20. Financial additions: ticket revenue rolls, lightweight dashboard summaries, and loan-ready hooks.
+21. Insurance-style mitigation through reputation and safety buffers.
+22. Permit-inspired pacing on expansion actions with helper logs.
+23. Multi-floor expansion tracking and capacity hooks.
+24. Exterior facade and branding appeal that feed curb-appeal multipliers.
+25. Photo/spotlight mode cues and cinematic-ready camera overlays.
+26. Achievement badges for packed houses, spotless nights, high reputation, and research unlocks.
+27. Multiple save slots (F8 cycles) plus cloud toggle plumbing.
+28. Performance overlay (F7) with spawn, weather, cleanliness, safety, power, and incident stats.
+29. Daily summary emails in the log with revenue/guests/reputation recaps.
+30. Staff chatter hooks through floating texts and mood bubbles.
+31. Guest detail overlays that surface moods, needs, and timers when selected.
+32. Financial dashboard readouts that surface rolling cashflow and category breakdowns.
+33. Loan and credit scaffolding with pressure from repayments and interest.
+34. Insurance-inspired mitigations that soften the cost of major incidents.
+35. Construction permit pacing for major builds to keep expansion strategic.
+36. Power management with outage tracking and backup generator recovery events.
+37. Multi-floor capacity and isolated sound-zone hooks for future routing.
+38. Exterior signage and logo customization beats that raise curb appeal.
+39. Photo/spotlight prompts to frame cinematic captures of the club.
+40. Achievement tracker covering reputation peaks, spotless runs, and packed houses.
+41. Cloud-sync toggle plumbing layered on top of the multi-slot save system.
+42. Staff chatter bubbles that surface service tips near bottlenecks.
+43. Contextual tooltips and hotkey overlays that can be toggled on demand.

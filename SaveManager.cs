@@ -21,7 +21,8 @@ namespace NightclubSim
 
     public static class SaveManager
     {
-        private const string FileName = "club_save.json";
+        public static int CurrentSlot { get; set; }
+        private static string FileName => $"club_save_slot_{CurrentSlot}.json";
 
         public static void Save(World world, Economy economy, List<Staff> staff, float rating)
         {

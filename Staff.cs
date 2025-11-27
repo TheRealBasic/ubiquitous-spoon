@@ -1,4 +1,5 @@
 using Microsoft.Xna.Framework;
+using System;
 
 namespace NightclubSim
 {
@@ -13,6 +14,7 @@ namespace NightclubSim
     {
         public StaffRole Role { get; }
         public Vector2 GridPosition { get; }
+        public StaffTrait? Trait { get; set; }
         public int HireCost => Role switch
         {
             StaffRole.Bartender => 250,
