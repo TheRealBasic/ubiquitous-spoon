@@ -10,6 +10,7 @@ namespace NightclubSim
         public int ExperienceToNext => 100 + (Level - 1) * 50;
 
         public event Action<string>? Log;
+        public event Action<int>? LevelledUp;
 
         public bool Spend(int amount)
         {
@@ -32,6 +33,17 @@ namespace NightclubSim
                 Experience -= ExperienceToNext;
                 Level++;
                 Log?.Invoke($"Leveled up to {Level}!");
+                LevelledUp?.Invoke(Level);
+            }
+        }
+
+        public void ChargeUpkeep(int amount)
+        {
+            Money -= amount;
+            if (Money < 0)
+            {
+                Money = 0;
+                Log?.Invoke("Upkeep drained funds!");
             }
         }
 

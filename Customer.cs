@@ -26,13 +26,15 @@ namespace NightclubSim
         private float _patience;
         public bool FrustratedLeave { get; private set; }
 
-        public float Satisfaction { get; set; } = 60f;
+        public float Satisfaction { get; set; }
         public CustomerPreference PreferredActivity { get; }
         public string CurrentActivity { get; private set; } = "Arriving";
         public bool IsSelected { get; set; }
         private float _thoughtTimer;
+        public bool IsVip { get; }
+        public float TimeInClub { get; private set; }
 
-        public Customer(Random rng, Point spawn)
+        public Customer(Random rng, Point spawn, bool vip = false, float startingSatisfaction = 60f)
         {
             _random = rng;
             GridPosition = new Vector2(spawn.X, spawn.Y);
@@ -44,12 +46,15 @@ namespace NightclubSim
             FrustratedLeave = false;
             PreferredActivity = (CustomerPreference)_random.Next(0, 3);
             _thoughtTimer = 2.5f + (float)_random.NextDouble() * 3f;
+            Satisfaction = startingSatisfaction;
+            IsVip = vip;
         }
 
         public override void Update(GameTime gameTime, World world)
         {
             base.Update(gameTime, world);
             float dt = (float)gameTime.ElapsedGameTime.TotalSeconds;
+            TimeInClub += dt;
             switch (State)
             {
                 case CustomerState.Arriving:
@@ -116,8 +121,6 @@ namespace NightclubSim
 
             UpdateSatisfaction(dt, world);
             _thoughtTimer -= dt;
-                }
-            }
         }
 
         public bool ReachedTarget()
@@ -198,6 +201,15 @@ namespace NightclubSim
             if (Satisfaction >= 40f) return "Wants a drink";
             if (Satisfaction >= 20f) return "Bored...";
             return "About to leave";
+        }
+
+        public string GetThoughtIcon(TileType tile)
+        {
+            if (FrustratedLeave) return "!";
+            if (tile == TileType.Bar) return "杯";
+            if (tile == TileType.DanceFloor) return "♪";
+            if (Satisfaction < 25f) return "...";
+            return PreferredActivity == CustomerPreference.Dance ? "♪" : "★";
         }
 
         public bool ShouldShowThought() => _thoughtTimer <= 0f;

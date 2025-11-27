@@ -59,6 +59,11 @@ namespace NightclubSim
         private int _sessionMoneyEarned;
         private float _clubRating = 1f;
         private float _prevTime;
+        private int _entranceQueue;
+        private float _queueFrustration;
+        private int _queueDenied;
+        private int _vipTonight;
+        private float _wageTimer = 15f;
 
         private MouseState _previousMouse;
         private KeyboardState _previousKeyboard;
@@ -88,6 +93,11 @@ namespace NightclubSim
             _tileTexture = TextureFactory.CreateDiamond(GraphicsDevice, _iso.TileWidth, _iso.TileHeight);
             _entityTexture = TextureFactory.CreateRectangle(GraphicsDevice, 12, 18, Color.White);
             _panelTexture = TextureFactory.CreateRectangle(GraphicsDevice, 1, 1, new Color(0, 0, 0, 0.5f));
+
+            _economy.LevelledUp += level =>
+            {
+                _floatingTexts.Add(new FloatingText($"LEVEL {level}!", new Vector2(260, 64), Color.Gold, 2.5f, 1.8f));
+            };
 
             // Staff starting positions
             _staff.Add(new Staff(StaffRole.Bartender, new Vector2(_world.Width / 2, _world.Height / 2)));
@@ -126,10 +136,27 @@ namespace NightclubSim
 
             UpdateFloatingTexts(dt);
 
+            if (_entranceQueue > 0)
+            {
+                _queueFrustration += dt * _entranceQueue * 0.1f;
+            }
+
+            _wageTimer -= dt;
+            if (_wageTimer <= 0f)
+            {
+                int wages = Math.Max(0, _staff.Count * 4);
+                if (wages > 0)
+                {
+                    _economy.ChargeUpkeep(wages);
+                    AddLog($"Paid ${wages} in wages.");
+                }
+                _wageTimer = 15f;
+            }
+
             _autosaveTimer -= dt;
             if (_autosaveTimer <= 0f)
             {
-                SaveManager.Save(_world, _economy, _staff);
+                SaveManager.Save(_world, _economy, _staff, _clubRating);
                 AddLog("Auto-saved.");
                 _autosaveTimer = 60f;
             }
@@ -177,6 +204,10 @@ namespace NightclubSim
                 _staff.Add(new Staff(StaffRole.DJ, new Vector2(3, 3)));
                 _staff.Add(new Staff(StaffRole.Bouncer, new Vector2(_world.Entrance.X, _world.Entrance.Y - 1)));
                 _clubRating = 1f;
+                _entranceQueue = 0;
+                _queueDenied = 0;
+                _vipTonight = 0;
+                _queueFrustration = 0;
                 foreach (var tile in _world.Tiles())
                 {
                     tile.PlacedObject = null;
@@ -210,6 +241,91 @@ namespace NightclubSim
             {
                 int itemCount = Enum.GetValues(typeof(PlaceableType)).Length - 1;
                 for (int i = 0; i < itemCount; i++)
+                {
+                    Keys key = Keys.D1 + i;
+                    if (keyboard.IsKeyDown(key) && !_previousKeyboard.IsKeyDown(key))
+                    {
+                        _selectedPlacement = (PlaceableType)(i + 1);
+                        AddLog($"Selected {_selectedPlacement}.");
+                    }
+                }
+                if (keyboard.IsKeyDown(Keys.Q) && !_previousKeyboard.IsKeyDown(Keys.Q))
+                {
+                    CyclePlacement(-1, itemCount);
+                }
+                if (keyboard.IsKeyDown(Keys.E) && !_previousKeyboard.IsKeyDown(Keys.E))
+                {
+                    CyclePlacement(1, itemCount);
+                }
+            }
+            else
+            {
+                StaffRole[] roles = { StaffRole.Bartender, StaffRole.DJ, StaffRole.Bouncer };
+                for (int i = 0; i < roles.Length; i++)
+                {
+                    Keys key = Keys.D1 + i;
+                    if (keyboard.IsKeyDown(key) && !_previousKeyboard.IsKeyDown(key))
+                    {
+                        _selectedStaff = roles[i];
+                        AddLog($"Hiring {_selectedStaff} selected.");
+                    }
+                }
+            }
+        }
+
+        private void CyclePlacement(int direction, int itemCount)
+        {
+            int idx = (int)_selectedPlacement - 1;
+            idx = (idx + direction + itemCount) % itemCount;
+            _selectedPlacement = (PlaceableType)(idx + 1);
+            AddLog($"Selected {_selectedPlacement}.");
+        }
+
+        private void HandleBuildSelectionInput(KeyboardState keyboard)
+        {
+            var mousePos = new Vector2(mouse.X, mouse.Y);
+            var grid = _iso.ToGrid(mousePos);
+
+            int scrollDelta = mouse.ScrollWheelValue - _previousMouse.ScrollWheelValue;
+            if (scrollDelta != 0)
+            {
+                _iso.Zoom = MathHelper.Clamp(_iso.Zoom + scrollDelta * 0.0015f, 0.6f, 1.8f);
+            }
+
+            if (mouse.RightButton == ButtonState.Pressed)
+            {
+                if (_previousMouse.RightButton == ButtonState.Released)
+                {
+                    _cameraDragging = true;
+                    _rightClickConsumed = false;
+                    _dragStart = mousePos;
+                    _cameraStart = _iso.Camera;
+                }
+                else if (_cameraDragging)
+                {
+                    var delta = mousePos - _dragStart;
+                    if (delta.LengthSquared() > 25f) _rightClickConsumed = true;
+                    _iso.Camera = _cameraStart + delta;
+                }
+            }
+            else if (_previousMouse.RightButton == ButtonState.Pressed)
+            {
+                bool treatAsClick = !_rightClickConsumed && _mode == GameMode.Build;
+                _cameraDragging = false;
+                if (treatAsClick)
+                {
+                    if (_world.Remove(grid.X, grid.Y))
+                    {
+                        _economy.AddIncome(10); // small refund
+                        AddLog("Item sold.");
+                    }
+                }
+            }
+
+            var leftClick = mouse.LeftButton == ButtonState.Pressed && _previousMouse.LeftButton == ButtonState.Released;
+            if (_mode == GameMode.Build && leftClick)
+            {
+                if (_buildTab == BuildTab.Items)
                 {
                     Keys key = Keys.D1 + i;
                     if (keyboard.IsKeyDown(key) && !_previousKeyboard.IsKeyDown(key))
@@ -356,12 +472,7 @@ namespace NightclubSim
                     if (delta.LengthSquared() > 25f) _rightClickConsumed = true;
                     _iso.Camera = _cameraStart + delta;
                 }
-            }
-            else if (_previousMouse.RightButton == ButtonState.Pressed)
-            {
-                bool treatAsClick = !_rightClickConsumed && _mode == GameMode.Build;
-                _cameraDragging = false;
-                if (treatAsClick)
+                else
                 {
                     if (!_world.IsInside(grid.X, grid.Y)) return;
                     var staffTemplate = new Staff(_selectedStaff, Vector2.Zero);
@@ -380,50 +491,6 @@ namespace NightclubSim
                     AddLog($"Hired {_selectedStaff}.");
                 }
             }
-
-            var leftClick = mouse.LeftButton == ButtonState.Pressed && _previousMouse.LeftButton == ButtonState.Released;
-            if (_mode == GameMode.Build && leftClick)
-            {
-                var placeable = Placeable.Create(_selectedPlacement);
-                if (_economy.Level < placeable.LevelRequirement)
-                {
-                    AddLog("Level too low.");
-                }
-                else if (!_world.CanPlace(grid.X, grid.Y))
-                {
-                    AddLog("Cannot build here.");
-                }
-                else if (!_economy.Spend(placeable.Cost))
-                {
-                    AddLog("Not enough money.");
-                }
-                else
-                {
-                    _world.Place(grid.X, grid.Y, placeable);
-                    AddLog($"Placed {placeable.Name}.");
-                }
-            }
-        }
-
-        private bool IsValidStaffPlacement(StaffRole role, Point grid)
-        {
-            if (!_world.IsInside(grid.X, grid.Y)) return false;
-            var tile = _world.GetTile(grid.X, grid.Y);
-            if (!tile.Walkable) return false;
-            if (role == StaffRole.Bouncer)
-            {
-                return Math.Abs(grid.X - _world.Entrance.X) + Math.Abs(grid.Y - _world.Entrance.Y) <= 2;
-            }
-            foreach (var offset in new[] { new Point(0, 0), new Point(1, 0), new Point(-1, 0), new Point(0, 1), new Point(0, -1) })
-            {
-                int nx = grid.X + offset.X;
-                int ny = grid.Y + offset.Y;
-                if (!_world.IsInside(nx, ny)) continue;
-                var t = _world.GetTile(nx, ny);
-                if (role == StaffRole.Bartender && t.Type == TileType.Bar) return true;
-                if (role == StaffRole.DJ && t.Type == TileType.DanceFloor) return true;
-            }
-            return false;
         }
 
         private bool IsValidStaffPlacement(StaffRole role, Point grid)
@@ -460,10 +527,14 @@ namespace NightclubSim
             {
                 float avgSat = _sessionGuests > 0 ? _sessionSatisfactionSum / _sessionGuests : 50f;
                 AddLog($"Night end: Guests {_sessionGuests}, Avg Sat {(int)avgSat}, Money ${_sessionMoneyEarned}.");
+                AddLog($"VIPs {_vipTonight}, Queue lost {_queueDenied}.");
                 _clubRating = ComputeRating(avgSat);
                 _sessionGuests = 0;
                 _sessionSatisfactionSum = 0;
                 _sessionMoneyEarned = 0;
+                _vipTonight = 0;
+                _queueDenied = 0;
+                _queueFrustration = 0;
             }
         }
 
@@ -474,15 +545,64 @@ namespace NightclubSim
             double spawnInterval = (_timeOfDay >= 18 || _timeOfDay <= 3) ? 2.0 : 5.0;
             int djCount = _staff.Count(s => s.Role == StaffRole.DJ);
             spawnInterval /= 1 + djCount * 0.15;
-            if (_spawnTimer <= 0 && _customers.Count < MaxCustomerCount())
+            spawnInterval /= 1 + _clubRating * 0.05f;
+            if (_spawnTimer <= 0)
             {
-                var tile = _world.Entrance;
-                var customer = new Customer(_rng, tile);
-                _customers.Add(customer);
-                AddLog("New customer entered.");
-                _sessionGuests++;
+                if (_customers.Count < MaxCustomerCount())
+                {
+                    SpawnCustomer(_entranceQueue > 0);
+                }
+                else
+                {
+                    _entranceQueue++;
+                    if (_entranceQueue > 16)
+                    {
+                        _entranceQueue--;
+                        _queueDenied++;
+                        AddLog("Someone left the queue.");
+                    }
+                }
                 _spawnTimer = spawnInterval;
             }
+
+            if (_entranceQueue > 0 && _customers.Count < MaxCustomerCount())
+            {
+                SpawnCustomer(true);
+            }
+        }
+
+        private void SpawnCustomer(bool fromQueue)
+        {
+            var tile = _world.Entrance;
+            bool vip = _rng.NextDouble() < MathHelper.Clamp(_clubRating * 0.05f, 0.03f, 0.4f);
+            float baseSat = vip ? 75f : 60f;
+            if (fromQueue)
+            {
+                baseSat -= Math.Min(25f, _entranceQueue * 2f);
+                _entranceQueue = Math.Max(0, _entranceQueue - 1);
+            }
+            var customer = new Customer(_rng, tile, vip, baseSat);
+            _customers.Add(customer);
+            if (vip)
+            {
+                AddLog("VIP arrived and expects service.");
+                _vipTonight++;
+            }
+            else
+            {
+                AddLog(fromQueue ? "Queued guest admitted." : "New customer entered.");
+            }
+            _sessionGuests++;
+            int entryFee = vip ? 30 : 15;
+            _economy.AddIncome(entryFee);
+            _sessionMoneyEarned += entryFee;
+            _floatingTexts.Add(new FloatingText($"+${entryFee}", _iso.ToScreen(tile.X, tile.Y) - new Vector2(0, 20), Color.LimeGreen, 1.1f, 1.1f));
+        }
+
+        private int MaxCustomerCount()
+        {
+            int bouncers = _staff.Count(s => s.Role == StaffRole.Bouncer);
+            return 18 + bouncers * 5;
         }
 
         private int MaxCustomerCount()
@@ -497,11 +617,14 @@ namespace NightclubSim
             float xpThisFrame = 0f;
             float satisfactionSum = 0f;
             var dt = (float)gameTime.ElapsedGameTime.TotalSeconds;
+            float bouncerShield = 1f + _staff.Count(s => s.Role == StaffRole.Bouncer) * 0.2f;
             for (int i = _customers.Count - 1; i >= 0; i--)
             {
                 var c = _customers[i];
                 c.Update(gameTime, _world);
                 var tile = _world.GetTile((int)c.GridPosition.X, (int)c.GridPosition.Y);
+                int nearbyBartenders = CountStaffNearby(StaffRole.Bartender, c.GridPosition);
+                int nearbyDjs = CountStaffNearby(StaffRole.DJ, c.GridPosition);
                 bool spending = false;
                 if (c.State == CustomerState.Using)
                 {
@@ -513,16 +636,32 @@ namespace NightclubSim
                     if (tile.Type == TileType.Table)
                         bonus += 0.1f * _staff.Count;
                     float earnRate = (tile.Type == TileType.Bar ? 5 : tile.Type == TileType.DanceFloor ? 3 : 2);
+                    if (c.IsVip) earnRate *= 1.6f;
                     incomeThisFrame += bonus * earnRate * dt;
                     xpThisFrame += (bonus * 0.5f) * dt;
                     spending = true;
+                }
+                if (tile.Type == TileType.Bar && nearbyBartenders > 0)
+                {
+                    c.Satisfaction = MathHelper.Clamp(c.Satisfaction + 3f * nearbyBartenders * dt, 0f, 100f);
+                }
+                if (tile.Type == TileType.DanceFloor && nearbyDjs > 0)
+                {
+                    c.Satisfaction = MathHelper.Clamp(c.Satisfaction + 2.5f * nearbyDjs * dt, 0f, 100f);
+                }
+                else if (nearbyDjs > 0)
+                {
+                    c.Satisfaction = MathHelper.Clamp(c.Satisfaction + 0.8f * nearbyDjs * dt, 0f, 100f);
+                }
+                int crowded = _customers.Count(o => o != c && Vector2.Distance(o.GridPosition, c.GridPosition) < 1.6f);
+                if (crowded > 2)
+                {
+                    c.Satisfaction = MathHelper.Clamp(c.Satisfaction - (crowded - 1) * 2f * dt / bouncerShield, 0f, 100f);
                 }
                 if (spending && _rng.NextDouble() < 0.15 * dt)
                 {
                     var screenPos = _iso.ToScreen((int)c.SmoothPosition.X, (int)c.SmoothPosition.Y) - new Vector2(0, 30);
                     _floatingTexts.Add(new FloatingText($"+${_rng.Next(6, 15)}", screenPos, Color.LimeGreen, 1.2f, 1.2f));
-                    incomeThisFrame += bonus * earnRate * (float)gameTime.ElapsedGameTime.TotalSeconds;
-                    xpThisFrame += (bonus * 0.5f) * (float)gameTime.ElapsedGameTime.TotalSeconds;
                 }
                 if (c.State == CustomerState.Leaving && c.ReachedTarget())
                 {
@@ -532,23 +671,20 @@ namespace NightclubSim
                     }
                     else
                     {
+                        if (c.Satisfaction > 75f && _rng.NextDouble() < (c.IsVip ? 0.7 : 0.35))
+                        {
+                            int tip = c.IsVip ? _rng.Next(20, 45) : _rng.Next(5, 20);
+                            _economy.AddIncome(tip);
+                            _sessionMoneyEarned += tip;
+                            _floatingTexts.Add(new FloatingText($"Tip +${tip}", _iso.ToScreen((int)c.SmoothPosition.X, (int)c.SmoothPosition.Y) - new Vector2(0, 26), Color.Gold, 1.3f, 1f));
+                        }
+                        _clubRating = MathHelper.Clamp(_clubRating + (c.Satisfaction / 2000f), 0f, 5f);
                         _floatingTexts.Add(new FloatingText("Thanks!", _iso.ToScreen((int)c.SmoothPosition.X, (int)c.SmoothPosition.Y) - new Vector2(0, 26), Color.LightBlue, 1.3f, 1f));
                     }
                     _sessionSatisfactionSum += c.Satisfaction;
                     _customers.RemoveAt(i);
                 }
                 satisfactionSum += c.Satisfaction;
-            }
-
-            _incomeBuffer += incomeThisFrame;
-            _xpBuffer += xpThisFrame;
-            int incomeDelta = (int)Math.Floor(_incomeBuffer);
-            if (incomeDelta > 0)
-            {
-                _economy.AddIncome(incomeDelta);
-                _sessionMoneyEarned += incomeDelta;
-                _incomeBuffer -= incomeDelta;
-                _floatingTexts.Add(new FloatingText($"+${incomeDelta}", new Vector2(220, 20), Color.LimeGreen, 1f, 1.1f));
             }
 
             _incomeBuffer += incomeThisFrame;
@@ -601,6 +737,7 @@ namespace NightclubSim
 
             var mouse = Mouse.GetState();
             DrawWorld(mouse);
+            DrawLightingOverlay();
             DrawFloatingTexts();
             DrawUI(mouse);
             DrawVignette();
@@ -629,6 +766,11 @@ namespace NightclubSim
                 var pos = _iso.ToScreen(gridHover.X, gridHover.Y);
                 _spriteBatch.Draw(_tileTexture, pos, null, new Color(255, 255, 0, 80), 0f, new Vector2(_tileTexture.Width / 2f, _tileTexture.Height / 2f), _iso.Zoom * 1.05f, SpriteEffects.None, 0f);
             }
+            else if (_world.IsInside(gridHover.X, gridHover.Y))
+            {
+                var pos = _iso.ToScreen(gridHover.X, gridHover.Y);
+                _spriteBatch.Draw(_tileTexture, pos, null, new Color(120, 180, 255, 40), 0f, new Vector2(_tileTexture.Width / 2f, _tileTexture.Height / 2f), _iso.Zoom * 1.02f, SpriteEffects.None, 0f);
+            }
 
             // Staff
             foreach (var staff in _staff)
@@ -642,6 +784,7 @@ namespace NightclubSim
             float closest = 18f;
             foreach (var c in _customers)
             {
+                var tile = _world.GetTile((int)c.GridPosition.X, (int)c.GridPosition.Y);
                 var pos = _iso.ToScreen((int)c.SmoothPosition.X, (int)c.SmoothPosition.Y) - new Vector2(0, 8);
                 DrawShadow(pos + new Vector2(0, 18));
                 _spriteBatch.Draw(_entityTexture, pos, null, Color.Cyan, 0f, new Vector2(_entityTexture.Width / 2f, _entityTexture.Height), _iso.Zoom, SpriteEffects.None, 0f);
@@ -664,6 +807,7 @@ namespace NightclubSim
                     if (c.Satisfaction < 30) bubbleColor = Color.DarkSlateGray;
                     _spriteBatch.Draw(_panelTexture, new Rectangle((int)bubblePos.X - 6, (int)bubblePos.Y - 6, 16, 12), bubbleColor * 0.8f);
                     _spriteBatch.Draw(_panelTexture, new Rectangle((int)bubblePos.X - 4, (int)bubblePos.Y - 4, 12, 8), Color.White * 0.6f);
+                    _font.DrawString(_spriteBatch, c.GetThoughtIcon(tile.Type), bubblePos + new Vector2(-4, -2), Color.Black, 1.1f);
                     c.ResetThoughtTimer();
                 }
             }
@@ -678,6 +822,14 @@ namespace NightclubSim
             {
                 _font.DrawString(_spriteBatch, ft.Text, ft.Position, ft.Color * ft.Opacity, ft.Scale);
             }
+        }
+
+        private void DrawLightingOverlay()
+        {
+            float cycle = MathF.Cos((_timeOfDay / 24f) * MathHelper.TwoPi);
+            float night = MathHelper.Clamp((cycle + 1f) * 0.35f, 0.05f, 0.35f);
+            var tint = new Color(10, 10, 25) * night;
+            _spriteBatch.Draw(_panelTexture, new Rectangle(0, 0, _graphics.PreferredBackBufferWidth, _graphics.PreferredBackBufferHeight), tint);
         }
 
         private void DrawUI(MouseState mouse)
@@ -695,7 +847,8 @@ namespace NightclubSim
             int bartenders = _staff.Count(s => s.Role == StaffRole.Bartender);
             int djs = _staff.Count(s => s.Role == StaffRole.DJ);
             int bouncers = _staff.Count(s => s.Role == StaffRole.Bouncer);
-            _font.DrawString(_spriteBatch, $"GUESTS: {_customers.Count} | STAFF: {_staff.Count} (Bnc {bouncers}/Bar {bartenders}/DJ {djs}) | RATING: {_clubRating:0.0}", new Vector2(260, 50), Color.LightSeaGreen, 1.5f);
+            _font.DrawString(_spriteBatch, $"GUESTS: {_customers.Count} | QUEUE: {_entranceQueue} | STAFF: {_staff.Count} (Bnc {bouncers}/Bar {bartenders}/DJ {djs})", new Vector2(260, 50), Color.LightSeaGreen, 1.5f);
+            _font.DrawString(_spriteBatch, $"RATING: {_clubRating:0.0} | VIPS: {_vipTonight}", new Vector2(260, 68), Color.LightGoldenrodYellow, 1.4f);
 
             if (_mode == GameMode.Build)
             {
@@ -765,46 +918,33 @@ namespace NightclubSim
             if (_mode != GameMode.Build) return;
             var grid = _iso.ToGrid(new Vector2(mouse.X, mouse.Y));
             if (!_world.IsInside(grid.X, grid.Y)) return;
-            var placeable = Placeable.Create(_selectedPlacement);
-            bool valid = _economy.Level >= placeable.LevelRequirement && _world.CanPlace(grid.X, grid.Y) && _economy.Money >= placeable.Cost;
-            var pos = _iso.ToScreen(grid.X, grid.Y);
-            var color = (valid ? Color.LimeGreen : Color.Red) * 0.4f;
-            _spriteBatch.Draw(_tileTexture, pos, null, color, 0f, new Vector2(_tileTexture.Width / 2f, _tileTexture.Height / 2f), _iso.Zoom * 1.05f, SpriteEffects.None, 0f);
-        }
-
-        private float ComputeRating()
-        {
-            int decor = 0, dance = 0, bar = 0;
-            foreach (var tile in _world.Tiles())
+            if (_buildTab == BuildTab.Items)
             {
-                if (tile.Type == TileType.Decor) decor++;
-                if (tile.Type == TileType.DanceFloor) dance++;
-                if (tile.Type == TileType.Bar) bar++;
+                var placeable = Placeable.Create(_selectedPlacement);
+                bool valid = _economy.Level >= placeable.LevelRequirement && _world.CanPlace(grid.X, grid.Y) && _economy.Money >= placeable.Cost;
+                var pos = _iso.ToScreen(grid.X, grid.Y);
+                var color = (valid ? Color.LimeGreen : Color.Red) * 0.4f;
+                _spriteBatch.Draw(_tileTexture, pos, null, color, 0f, new Vector2(_tileTexture.Width / 2f, _tileTexture.Height / 2f), _iso.Zoom * 1.05f, SpriteEffects.None, 0f);
             }
-            float rating = 1f + decor * 0.05f + dance * 0.07f + bar * 0.05f + _staff.Count * 0.05f;
-            return MathHelper.Clamp(rating, 1f, 5f);
+            else
+            {
+                var pos = _iso.ToScreen(grid.X, grid.Y);
+                var valid = IsValidStaffPlacement(_selectedStaff, grid) && _economy.Money >= new Staff(_selectedStaff, Vector2.Zero).HireCost;
+                var color = (valid ? Color.LimeGreen : Color.Red) * 0.35f;
+                _spriteBatch.Draw(_tileTexture, pos, null, color, 0f, new Vector2(_tileTexture.Width / 2f, _tileTexture.Height / 2f), _iso.Zoom * 1.05f, SpriteEffects.None, 0f);
+            }
         }
 
-        private void DrawTileTooltip(MouseState mouse, Vector2 start)
+        private int CountStaffNearby(StaffRole role, Vector2 position)
         {
-            var grid = _iso.ToGrid(new Vector2(mouse.X, mouse.Y));
-            if (!_world.IsInside(grid.X, grid.Y)) return;
-            var tile = _world.GetTile(grid.X, grid.Y);
-            string occupant = tile.PlacedObject != null ? $" ({tile.PlacedObject.Name})" : string.Empty;
-            _font.DrawString(_spriteBatch, $"Hover: {tile.Type}{occupant}", start, Color.LightSteelBlue, 1.2f);
-        }
-
-        private void DrawBuildPreview(MouseState mouse)
-        {
-            if (_mode != GameMode.Build) return;
-            if (_buildTab != BuildTab.Items) return;
-            var grid = _iso.ToGrid(new Vector2(mouse.X, mouse.Y));
-            if (!_world.IsInside(grid.X, grid.Y)) return;
-            var placeable = Placeable.Create(_selectedPlacement);
-            bool valid = _economy.Level >= placeable.LevelRequirement && _world.CanPlace(grid.X, grid.Y) && _economy.Money >= placeable.Cost;
-            var pos = _iso.ToScreen(grid.X, grid.Y);
-            var color = (valid ? Color.LimeGreen : Color.Red) * 0.4f;
-            _spriteBatch.Draw(_tileTexture, pos, null, color, 0f, new Vector2(_tileTexture.Width / 2f, _tileTexture.Height / 2f), _iso.Zoom * 1.05f, SpriteEffects.None, 0f);
+            int count = 0;
+            foreach (var s in _staff)
+            {
+                if (s.Role != role) continue;
+                float dist = Math.Abs(s.GridPosition.X - position.X) + Math.Abs(s.GridPosition.Y - position.Y);
+                if (dist <= 1.1f) count++;
+            }
+            return count;
         }
 
         private float ComputeRating(float avgSatisfaction)
@@ -818,7 +958,8 @@ namespace NightclubSim
             }
             float variety = MathHelper.Clamp(1f + decor * 0.03f + dance * 0.05f + bar * 0.04f, 1f, 5f);
             float crowdPenalty = Math.Max(0, _customers.Count - MaxCustomerCount() + 5) * 0.05f;
-            float rating = (avgSatisfaction / 25f) + variety - crowdPenalty;
+            float queuePenalty = MathHelper.Clamp(_queueFrustration * 0.02f, 0f, 1.5f);
+            float rating = (avgSatisfaction / 25f) + variety - crowdPenalty - queuePenalty;
             return MathHelper.Clamp(rating, 0f, 5f);
         }
 
@@ -835,12 +976,14 @@ namespace NightclubSim
         {
             var selected = _customers.FirstOrDefault(c => c.IsSelected);
             if (selected == null) return;
-            _spriteBatch.Draw(_panelTexture, new Rectangle((int)start.X - 6, (int)start.Y - 8, 210, 90), new Color(0, 0, 0, 170));
+            _spriteBatch.Draw(_panelTexture, new Rectangle((int)start.X - 6, (int)start.Y - 8, 210, 120), new Color(0, 0, 0, 170));
             _font.DrawString(_spriteBatch, "GUEST", start, Color.White, 1.8f);
             _font.DrawString(_spriteBatch, $"Sat: {(int)selected.Satisfaction}", start + new Vector2(0, 18), Color.LightGreen, 1.5f);
             _font.DrawString(_spriteBatch, selected.GetMoodDescription(), start + new Vector2(0, 34), Color.LightGray, 1.2f);
             _font.DrawString(_spriteBatch, $"Activity: {selected.CurrentActivity}", start + new Vector2(0, 50), Color.LightSteelBlue, 1.2f);
             _font.DrawString(_spriteBatch, $"Pref: {selected.PreferredActivity}", start + new Vector2(0, 66), Color.LightSteelBlue, 1.2f);
+            _font.DrawString(_spriteBatch, selected.IsVip ? "VIP" : "Standard", start + new Vector2(0, 82), selected.IsVip ? Color.Gold : Color.LightSteelBlue, 1.2f);
+            _font.DrawString(_spriteBatch, $"Time: {selected.TimeInClub:0.0}s", start + new Vector2(0, 98), Color.LightSteelBlue, 1.2f);
         }
 
         private void DrawDebugPanel(Vector2 start)
@@ -849,12 +992,13 @@ namespace NightclubSim
             int djs = _staff.Count(s => s.Role == StaffRole.DJ);
             int bouncers = _staff.Count(s => s.Role == StaffRole.Bouncer);
             float avgSat = _customers.Count > 0 ? _customers.Average(c => c.Satisfaction) : 0f;
-            _spriteBatch.Draw(_panelTexture, new Rectangle((int)start.X - 6, (int)start.Y - 6, 210, 80), new Color(0, 0, 0, 180));
+            _spriteBatch.Draw(_panelTexture, new Rectangle((int)start.X - 6, (int)start.Y - 6, 210, 96), new Color(0, 0, 0, 180));
             _font.DrawString(_spriteBatch, "DEBUG", start, Color.Orange, 1.8f);
             _font.DrawString(_spriteBatch, $"Customers: {_customers.Count}", start + new Vector2(0, 16), Color.LightGray, 1.2f);
             _font.DrawString(_spriteBatch, $"Avg Sat: {avgSat:0.0}", start + new Vector2(0, 30), Color.LightGray, 1.2f);
             _font.DrawString(_spriteBatch, $"Staff B/D/J: {bouncers}/{bartenders}/{djs}", start + new Vector2(0, 44), Color.LightGray, 1.2f);
             _font.DrawString(_spriteBatch, $"Rating: {_clubRating:0.00}", start + new Vector2(0, 58), Color.LightGray, 1.2f);
+            _font.DrawString(_spriteBatch, $"Queue: {_entranceQueue} Lost: {_queueDenied}", start + new Vector2(0, 72), Color.LightGray, 1.2f);
         }
 
         private void DrawVignette()
