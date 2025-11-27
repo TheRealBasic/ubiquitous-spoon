@@ -64,6 +64,7 @@ namespace NightclubSim
         private int _queueDenied;
         private int _vipTonight;
         private float _wageTimer = 15f;
+        private readonly ClubSystems _systems = new();
 
         private MouseState _previousMouse;
         private KeyboardState _previousKeyboard;
@@ -86,6 +87,7 @@ namespace NightclubSim
             _iso.Origin = new Vector2(_graphics.PreferredBackBufferWidth / 2f, _graphics.PreferredBackBufferHeight / 4f);
             _world = new World(16, 12);
             _economy.Log += AddLog;
+            SaveManager.CurrentSlot = 0;
             base.Initialize();
         }
 
@@ -138,6 +140,7 @@ namespace NightclubSim
             }
 
             UpdateFloatingTexts(dt);
+            _systems.Update(_economy, _world, _customers, _staff, _rng, AddLog, dt);
 
             if (_entranceQueue > 0)
             {
@@ -234,6 +237,20 @@ namespace NightclubSim
             if (keyboard.IsKeyDown(Keys.F2) && !_previousKeyboard.IsKeyDown(Keys.F2))
             {
                 _buildTab = _buildTab == BuildTab.Items ? BuildTab.Staff : BuildTab.Items;
+            }
+            if (keyboard.IsKeyDown(Keys.F6) && !_previousKeyboard.IsKeyDown(Keys.F6))
+            {
+                _systems.ToggleSandbox(_economy);
+                AddLog(_economy.Sandbox ? "Sandbox mode: free builds enabled." : "Sandbox mode off.");
+            }
+            if (keyboard.IsKeyDown(Keys.F7) && !_previousKeyboard.IsKeyDown(Keys.F7))
+            {
+                _systems.ShowPerformanceOverlay = !_systems.ShowPerformanceOverlay;
+            }
+            if (keyboard.IsKeyDown(Keys.F8) && !_previousKeyboard.IsKeyDown(Keys.F8))
+            {
+                SaveManager.CurrentSlot = (SaveManager.CurrentSlot + 1) % 3;
+                AddLog($"Switched to save slot {SaveManager.CurrentSlot}.");
             }
         }
 
@@ -421,6 +438,7 @@ namespace NightclubSim
             int djCount = _staff.Count(s => s.Role == StaffRole.DJ);
             spawnInterval /= 1 + djCount * 0.15;
             spawnInterval /= 1 + _clubRating * 0.05f;
+            spawnInterval /= _systems.GetSpawnModifier();
             if (_spawnTimer <= 0)
             {
                 if (_customers.Count < MaxCustomerCount())
@@ -718,6 +736,9 @@ namespace NightclubSim
             int bouncers = _staff.Count(s => s.Role == StaffRole.Bouncer);
             _font.DrawString(_spriteBatch, $"GUESTS: {_customers.Count} | QUEUE: {_entranceQueue} | STAFF: {_staff.Count} (Bnc {bouncers}/Bar {bartenders}/DJ {djs})", new Vector2(260, 50), Color.LightSeaGreen, 1.5f);
             _font.DrawString(_spriteBatch, $"RATING: {_clubRating:0.0} | VIPS: {_vipTonight}", new Vector2(260, 68), Color.LightGoldenrodYellow, 1.4f);
+            _font.DrawString(_spriteBatch, $"WEATHER: {_systems.Weather} | THEME: {_systems.TonightTheme}", new Vector2(680, 10), Color.LightSkyBlue, 1.3f);
+            _font.DrawString(_spriteBatch, $"REPUTATION: {_systems.Reputation:0.0} | CLEAN: {_systems.Cleanliness:0.0} | POWER: {_systems.PowerLoad:0.0}", new Vector2(680, 28), Color.LightPink, 1.2f);
+            _font.DrawString(_spriteBatch, $"TICKET: ${_systems.TicketPrice:0.0} | CAMPAIGNS: {_systems.Reputation:0.0}x hype | FLOORS: {_systems.Floors}", new Vector2(680, 46), Color.LightGreen, 1.2f);
 
             if (_mode == GameMode.Build)
             {
@@ -734,6 +755,10 @@ namespace NightclubSim
             if (_showDebug)
             {
                 DrawDebugPanel(new Vector2(_graphics.PreferredBackBufferWidth - 220, 10));
+            }
+            if (_systems.ShowPerformanceOverlay)
+            {
+                DrawPerformanceOverlay(new Vector2(_graphics.PreferredBackBufferWidth - 220, 200));
             }
         }
 
@@ -868,6 +893,19 @@ namespace NightclubSim
             _font.DrawString(_spriteBatch, $"Staff B/D/J: {bouncers}/{bartenders}/{djs}", start + new Vector2(0, 44), Color.LightGray, 1.2f);
             _font.DrawString(_spriteBatch, $"Rating: {_clubRating:0.00}", start + new Vector2(0, 58), Color.LightGray, 1.2f);
             _font.DrawString(_spriteBatch, $"Queue: {_entranceQueue} Lost: {_queueDenied}", start + new Vector2(0, 72), Color.LightGray, 1.2f);
+        }
+
+        private void DrawPerformanceOverlay(Vector2 start)
+        {
+            _spriteBatch.Draw(_panelTexture, new Rectangle((int)start.X - 6, (int)start.Y - 6, 210, 132), new Color(0, 0, 0, 170));
+            _font.DrawString(_spriteBatch, "OVERLAY", start, Color.LightGreen, 1.8f);
+            _font.DrawString(_spriteBatch, $"Spawn x{_systems.GetSpawnModifier():0.00}", start + new Vector2(0, 18), Color.LightGray, 1.2f);
+            _font.DrawString(_spriteBatch, $"Weather: {_systems.Weather}", start + new Vector2(0, 34), Color.LightGray, 1.2f);
+            _font.DrawString(_spriteBatch, $"Clean: {_systems.Cleanliness:0.00}", start + new Vector2(0, 50), Color.LightGray, 1.2f);
+            _font.DrawString(_spriteBatch, $"Safety: {_systems.Safety:0.00}", start + new Vector2(0, 66), Color.LightGray, 1.2f);
+            _font.DrawString(_spriteBatch, $"Power: {_systems.PowerLoad:0.00}", start + new Vector2(0, 82), Color.LightGray, 1.2f);
+            _font.DrawString(_spriteBatch, $"Incidents: {_systems.NightlyIncidents}", start + new Vector2(0, 98), Color.LightGray, 1.2f);
+            _font.DrawString(_spriteBatch, $"Emails: {_systems.NightlyEmails}", start + new Vector2(0, 114), Color.LightGray, 1.2f);
         }
 
         private void DrawVignette()
