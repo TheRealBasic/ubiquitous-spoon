@@ -662,7 +662,7 @@ namespace NightclubSim
                     _spriteBatch.Draw(_tileTexture, _iso.ToScreen((int)c.GridPosition.X, (int)c.GridPosition.Y), null, new Color(0, 200, 255, 80), 0f, new Vector2(_tileTexture.Width / 2f, _tileTexture.Height / 2f), _iso.Zoom * 1.1f, SpriteEffects.None, 0f);
                 }
 
-                float dist = Vector2.Distance(pos, new Vector2(mouse.X, mouse.Y));
+                float dist = Vector2.Distance(foot, new Vector2(mouse.X, mouse.Y));
                 if (dist < closest)
                 {
                     closest = dist;
@@ -671,7 +671,7 @@ namespace NightclubSim
 
                 if (c.ShouldShowThought())
                 {
-                    var bubblePos = pos - new Vector2(0, 24);
+                    var bubblePos = foot - new Vector2(0, 24);
                     Color bubbleColor = c.PreferredActivity == CustomerPreference.Dance ? Color.MediumPurple : Color.SandyBrown;
                     if (c.Satisfaction < 30) bubbleColor = Color.DarkSlateGray;
                     _spriteBatch.Draw(_panelTexture, new Rectangle((int)bubblePos.X - 6, (int)bubblePos.Y - 6, 16, 12), bubbleColor * 0.8f);
